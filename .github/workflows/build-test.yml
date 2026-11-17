@@ -1,9 +1,7 @@
 name: Build Test
 
 on:
-  push:
-    branches: [master]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: unity-license        # Personal license = only one Unity job at a time
