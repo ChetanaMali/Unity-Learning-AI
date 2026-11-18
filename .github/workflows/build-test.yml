@@ -50,13 +50,19 @@ jobs:
     needs: build
     runs-on: macos-latest
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: build-iOS
           path: ios-build
-      - name: Compile without signing
+
+      - name: Fix script permissions
+        run: find ios-build -name "*.sh" -exec chmod +x {} \;
+
+      - name: Compile for real iPhone (no signing)
         run: |
           PROJECT=$(find ios-build -name "Unity-iPhone.xcodeproj" | head -n 1)
           xcodebuild -project "$PROJECT" -scheme Unity-iPhone \
-            -sdk iphonesimulator -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO build
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
