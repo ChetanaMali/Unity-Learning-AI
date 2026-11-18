@@ -1,0 +1,42 @@
+name: iOS Compile Only (manual)
+
+on:
+  workflow_dispatch:          # adds a "Run workflow" button
+    inputs:
+      run_id:
+        description: "Run ID of the Build Test run that made the iOS build"
+        required: true
+
+permissions:
+  actions: read               # needed to download artifacts from another run
+
+jobs:
+  ios-compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: build-iOS
+          path: ios-build
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Unpack or fix permissions
+        run: |
+          if [ -f ios-build/ios-project.tar.gz ]; then
+            tar -xzf ios-build/ios-project.tar.gz -C ios-build
+          else
+            chmod -R +x ios-build
+          fi
+          find ios-build -maxdepth 3
+
+      - name: Compile for real iPhone (no signing)
+        run: |
+          PROJECT=$(find ios-build -name "Unity-iPhone.xcodeproj" | head -n 1)
+          if [ -z "$PROJECT" ]; then echo "ERROR: project not found"; exit 1; fi
+          echo "Found project: $PROJECT"
+          xcodebuild -quiet -project "$PROJECT" -scheme Unity-iPhone \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
