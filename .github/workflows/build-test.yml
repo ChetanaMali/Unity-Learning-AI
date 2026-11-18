@@ -1,81 +1,66 @@
-name: Build Test
+name: Android CI
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: 
 
 concurrency:
-  group: unity-license        # Personal license = only one Unity job at a time
+  group: unity-license
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build ${{ matrix.targetPlatform }}
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 1
-      fail-fast: false
-      matrix:
-        targetPlatform: [Android, iOS]
     steps:
-      # 1. Download the project
       - uses: actions/checkout@v5
         with:
           lfs: true
 
-      # 2. Restore Library cache (makes builds much faster)
       - uses: actions/cache@v5
         with:
           path: Library
-          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: Library-${{ matrix.targetPlatform }}-
+          key: Library-test-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: Library-test-
 
-      # 3. Build with Unity (license is activated automatically)
-      - uses: game-ci/unity-builder@v6.0.0
+      - uses: game-ci/unity-test-runner@v4.4.0
+        id: tests
         env:
-          UNITY_EMAIL: ${{ secrets.EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.PASSWORD }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          targetPlatform: ${{ matrix.targetPlatform }}
-
-      # 4. Save the result
-      # Android: upload normally
-      - uses: actions/upload-artifact@v6
-        if: matrix.targetPlatform != 'iOS'
-        with:
-          name: build-${{ matrix.targetPlatform }}
-          path: build/${{ matrix.targetPlatform }}
-
-      # iOS: pack with tar first (keeps file permissions)
-      - name: Pack iOS project
-        if: matrix.targetPlatform == 'iOS'
-        run: tar -czf ios-project.tar.gz -C build iOS
+          testMode: all          # EditMode + PlayMode
 
       - uses: actions/upload-artifact@v6
-        if: matrix.targetPlatform == 'iOS'
+        if: always()             # upload results even if tests fail
         with:
-          name: build-iOS
-          path: ios-project.tar.gz
+          name: test-results
+          path: ${{ steps.tests.outputs.artifactsPath }}
 
-  # 5. iOS only: check the Xcode project really compiles (needs a Mac)
-  ios-compile:
-    name: Compile iOS on Mac
-    needs: build
-    runs-on: macos-latest
+  build:
+    name: Build Android APK
+    needs: test                  # only builds if tests pass
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/checkout@v5
         with:
-          name: build-iOS
-          path: ios-build
+          lfs: true
 
-      - name: Fix script permissions
-        run: chmod -R +x ios-build
+      - uses: actions/cache@v5
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: Library-Android-
 
-      - name: Compile for real iPhone (no signing)
-        run: |
-          PROJECT=$(find ios-build -name "Unity-iPhone.xcodeproj" | head -n 1)
-          xcodebuild -project "$PROJECT" -scheme Unity-iPhone \
-            -sdk iphoneos -destination 'generic/platform=iOS' \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            build
+      - uses: game-ci/unity-builder@v6.0.0
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          targetPlatform: Android
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: android-apk
+          path: build/Android
