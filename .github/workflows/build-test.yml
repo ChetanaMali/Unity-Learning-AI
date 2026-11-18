@@ -39,10 +39,23 @@ jobs:
           targetPlatform: ${{ matrix.targetPlatform }}
 
       # 4. Save the result
+      # Android: upload normally
       - uses: actions/upload-artifact@v6
+        if: matrix.targetPlatform != 'iOS'
         with:
           name: build-${{ matrix.targetPlatform }}
           path: build/${{ matrix.targetPlatform }}
+
+      # iOS: pack with tar first (keeps file permissions)
+      - name: Pack iOS project
+        if: matrix.targetPlatform == 'iOS'
+        run: tar -czf ios-project.tar.gz -C build iOS
+
+      - uses: actions/upload-artifact@v6
+        if: matrix.targetPlatform == 'iOS'
+        with:
+          name: build-iOS
+          path: ios-project.tar.gz
 
   # 5. iOS only: check the Xcode project really compiles (needs a Mac)
   ios-compile:
@@ -56,7 +69,7 @@ jobs:
           path: ios-build
 
       - name: Fix script permissions
-        run: find ios-build -name "*.sh" -exec chmod +x {} \;
+        run: chmod -R +x ios-build
 
       - name: Compile for real iPhone (no signing)
         run: |
