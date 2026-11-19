@@ -30,6 +30,8 @@ jobs:
           key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-${{ matrix.targetPlatform }}-
+          targetPlatform: ${{ matrix.targetPlatform }}
+          androidTargetSdkVersion: AndroidApiLevel35
 
       - if: matrix.targetPlatform == 'Android'
         uses: jlumbroso/free-disk-space@v1.3.1
