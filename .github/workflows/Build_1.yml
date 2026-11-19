@@ -1,0 +1,52 @@
+name: Build project
+
+on: [workflow_dispatch, push, pull_request]
+
+concurrency:
+  group: unity-license          # one Unity job at a time (free license)
+  cancel-in-progress: false
+
+jobs:
+  buildForAllSupportedPlatforms:
+    name: Build for ${{ matrix.targetPlatform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1           # build platforms one after another
+      matrix:
+        targetPlatform:
+          - StandaloneOSX       # macOS
+          - StandaloneWindows   # Windows 32-bit
+          - StandaloneWindows64 # Windows 64-bit
+          - StandaloneLinux64   # Linux
+          - iOS                 # Xcode project only (needs a Mac to finish)
+          - Android             # .apk
+          - WebGL               # browser game
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - uses: actions/cache@v5
+        with:
+          path: Library
+          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ matrix.targetPlatform }}-
+
+      - if: matrix.targetPlatform == 'Android'
+        uses: jlumbroso/free-disk-space@v1.3.1
+
+      - uses: game-ci/unity-builder@v6.0.0
+        env:
+          UNITY_EMAIL: ${{ secrets.EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.PASSWORD }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          targetPlatform: ${{ matrix.targetPlatform }}
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Build-${{ matrix.targetPlatform }}
+          path: build/${{ matrix.targetPlatform }}
