@@ -16,10 +16,6 @@ jobs:
       matrix:
         targetPlatform:
           - StandaloneOSX       # macOS
-          - StandaloneWindows   # Windows 32-bit
-          - StandaloneWindows64 # Windows 64-bit
-          - StandaloneLinux64   # Linux
-          - iOS                 # Xcode project only (needs a Mac to finish)
           - Android             # .apk
           - WebGL               # browser game
     steps:
